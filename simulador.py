@@ -174,6 +174,10 @@ class Simulador:
             self.create_gantt_bar(processo.id, processo.inicio, processo.fim, "execucao", processo.inicio)
                         
             processo.concluido = True
+
+            for p in self.processos:
+                if p != processo and p.chegada <= current_time and not p.concluido and p.tempo_restante > 0:
+                    self.create_gantt_bar(p.id, p.chegada, current_time, 'wait', processo.inicio)
             
             self.master.after(500, lambda: self.simulate_fifo(current_time))
     
@@ -193,16 +197,16 @@ class Simulador:
         
          processo = min(processos_disponiveis, key=lambda p: p.execucao)
 
-         if current_time < processo.chegada:
-            self.create_gantt_bar(processo.id, current_time, processo.chegada, "wait", processo.inicio)
-            current_time = processo.chegada
-
          processo.inicio = current_time
          current_time += processo.execucao
          processo.fim = current_time
          self.create_gantt_bar(processo.id, processo.inicio, processo.fim, "execucao", processo.inicio)
                
          processo.concluido = True
+
+         for p in self.processos:
+              if p != processo and p.chegada <= current_time and not p.concluido and p.tempo_restante > 0:
+                  self.create_gantt_bar(p.id, p.chegada, current_time, 'wait', processo.inicio)
         
          self.master.after(500, lambda: self.simulate_sjf(current_time))
 
@@ -319,6 +323,11 @@ class Simulador:
               self.create_gantt_bar(processo.id, sobrecarga_inicio, current_time, 'sobrecarga', processo.inicio)
            queue.pop(0)
            queue.insert(0, processo)
+
+      for p in self.processos:
+          if p != processo and p.chegada <= current_time and not p.concluido and p.tempo_restante > 0:
+              wait_start_time = p.chegada if p.chegada > start else start
+              self.create_gantt_bar(p.id, wait_start_time, current_time, 'wait', processo.inicio)
        
       self.master.after(500, lambda: self.simulate_edf(current_time, quantum, sobrecarga))
 
