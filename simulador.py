@@ -3,12 +3,11 @@ from tkinter import ttk, messagebox
 import time
 
 class Processo:
-    def __init__(self, id, chegada, execucao, deadline, sobrecarga, paginas):
+    def __init__(self, id, chegada, execucao, deadline, paginas):
         self.id = id
         self.chegada = chegada
         self.execucao = execucao
         self.deadline = deadline
-        self.sobrecarga = sobrecarga
         self.paginas = paginas
         self.tempo_restante = execucao
         self.inicio = None
@@ -36,10 +35,15 @@ class Simulador:
         self.algorithm_combobox = ttk.Combobox(master, values=["FIFO", "SJF", "Round Robin", "EDF"])
         self.algorithm_combobox.grid(row=2, column=1, sticky="w")
 
-        ttk.Label(master, text="Quantum (Round Robin):").grid(row=2, column=2, sticky="w")
+        ttk.Label(master, text="Quantum (Round Robin):").grid(row=2, column=2, sticky="e")
         self.quantum_entry = ttk.Entry(master)
         self.quantum_entry.insert(0, "2") # Valor default
         self.quantum_entry.grid(row=2, column=3, sticky="w")
+
+        ttk.Label(master, text="Sobrecarga:").grid(row=2, column=4, sticky="e")
+        self.sobrecarga_entry = ttk.Entry(master)
+        self.sobrecarga_entry.insert(0, "0") # Valor default
+        self.sobrecarga_entry.grid(row=2, column=5, sticky="w")
 
         ttk.Button(master, text="Iniciar Simulação", command=self.start_simulation).grid(row=3, column=0, columnspan=4, pady=10)
         
@@ -85,7 +89,6 @@ class Simulador:
               "Chegada": ("entry", "0"),
                 "Execução": ("entry", "1"),
                 "Deadline": ("entry", "10"),
-               "Sobrecarga": ("entry", "0"),
                "Páginas": ("entry", "1")
           }
           
@@ -108,10 +111,9 @@ class Simulador:
                 chegada = int(fields["Chegada"].get())
                 execucao = int(fields["Execução"].get())
                 deadline = int(fields["Deadline"].get())
-                sobrecarga = int(fields["Sobrecarga"].get())
                 paginas = int(fields["Páginas"].get())
                 
-                processo = Processo(i + 1, chegada, execucao, deadline, sobrecarga, paginas)
+                processo = Processo(i + 1, chegada, execucao, deadline, paginas)
                 self.processos.append(processo)
               except ValueError:
                 messagebox.showerror("Erro", "Por favor, preencha todos os campos com valores inteiros válidos.")
@@ -136,15 +138,16 @@ class Simulador:
         
         algoritmo = self.algorithm_combobox.get()
         quantum = int(self.quantum_entry.get())
+        sobrecarga = int(self.sobrecarga_entry.get())
         
         if algoritmo == "FIFO":
             self.simulate_fifo(0)
         elif algoritmo == "SJF":
             self.simulate_sjf(0)
         elif algoritmo == "Round Robin":
-             self.simulate_round_robin(0, quantum)
+             self.simulate_round_robin(0, quantum, sobrecarga)
         elif algoritmo == "EDF":
-            self.simulate_edf(0, quantum)
+            self.simulate_edf(0, quantum, sobrecarga)
         else:
             messagebox.showerror("Erro", "Selecione um algoritmo.")
             self.animation_running = False
@@ -203,7 +206,7 @@ class Simulador:
         
          self.master.after(500, lambda: self.simulate_sjf(current_time))
 
-    def simulate_round_robin(self, current_time, quantum):
+    def simulate_round_robin(self, current_time, quantum, sobrecarga):
         # Inicializar tempo de espera para cada processo
         for processo in self.processos:
             if not hasattr(processo, 'tempo_espera'):
@@ -228,7 +231,7 @@ class Simulador:
                 self.animation_running = False
                 return
             else:  # Aguardar o próximo instante
-                self.master.after(500, lambda: self.simulate_round_robin(current_time + 1, quantum))
+                self.master.after(500, lambda: self.simulate_round_robin(current_time + 1, quantum, sobrecarga))
                 return
 
         # Zerar o tempo de espera do processo selecionado
@@ -253,25 +256,27 @@ class Simulador:
             processo.concluido = True
         else:
             # Aplicar sobrecarga
-            if processo.sobrecarga > 0:
+            if sobrecarga > 0:
                 sobrecarga_inicio = current_time
-                current_time += processo.sobrecarga
+                current_time += sobrecarga
                 self.create_gantt_bar(processo.id, sobrecarga_inicio, current_time, 'sobrecarga', processo.inicio)
 
         # Incrementar tempo de espera de todos os outros processos
         for p in self.processos:
             if p != processo and p.chegada <= current_time and not p.concluido and p.tempo_restante > 0:
                 p.tempo_espera += current_time - start
+                wait_start_time = p.chegada if p.chegada > start else start
+                self.create_gantt_bar(p.id, wait_start_time, current_time, 'wait', processo.inicio)
 
         # Chamar a próxima execução
-        self.master.after(500, lambda: self.simulate_round_robin(current_time, quantum))
+        self.master.after(500, lambda: self.simulate_round_robin(current_time, quantum, sobrecarga))
 
 
 
 
 
        
-    def simulate_edf(self, current_time, quantum):
+    def simulate_edf(self, current_time, quantum, sobrecarga):
       queue = [p for p in self.processos if not p.concluido]
       if not queue:
             self.calculate_and_update_results(self.processos)
@@ -283,7 +288,7 @@ class Simulador:
         
        # Caso todos os processos ainda não tenham chegado espera
       if not queue:
-           self.master.after(500, lambda: self.simulate_edf(current_time + 1, quantum))
+           self.master.after(500, lambda: self.simulate_edf(current_time + 1, quantum, sobrecarga))
            return
 
       queue.sort(key=lambda p: p.deadline)
@@ -308,20 +313,20 @@ class Simulador:
            processo.concluido = True
            queue.pop(0)
       else:
-           if processo.sobrecarga > 0:
+           if sobrecarga > 0:
               sobrecarga_inicio = current_time
-              current_time += processo.sobrecarga
+              current_time += sobrecarga
               self.create_gantt_bar(processo.id, sobrecarga_inicio, current_time, 'sobrecarga', processo.inicio)
            queue.pop(0)
            queue.insert(0, processo)
        
-      self.master.after(500, lambda: self.simulate_edf(current_time, quantum))
+      self.master.after(500, lambda: self.simulate_edf(current_time, quantum, sobrecarga))
 
     def create_gantt_bar(self, process_id, start, end, tipo, start_time):
         if not start_time or process_id not in self.process_start_time:
             self.process_start_time[process_id] = start
           
-        start = self.process_start_time[process_id]
+        # start = self.process_start_time[process_id]
         
         largura = (end - start) * 50
         x0 = start * 50
@@ -337,7 +342,7 @@ class Simulador:
             cor = "red"
         else:
             cor = "gray"
-        
+
         self.gantt_canvas.create_rectangle(x0, y0, x1, y1, fill=cor, tags=f"processo_{process_id}")
         self.gantt_canvas.create_text((x0 + x1) / 2, (y0 + y1) / 2, text=f"P{process_id} ({start}-{end})", tags=f"processo_{process_id}")
         self.gantt_canvas.config(scrollregion=self.gantt_canvas.bbox("all"))
