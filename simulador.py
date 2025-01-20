@@ -46,20 +46,27 @@ class Simulador:
         self.sobrecarga_entry.grid(row=2, column=5, sticky="w")
 
         ttk.Button(master, text="Iniciar Simulação", command=self.start_simulation).grid(row=3, column=0, columnspan=4, pady=10)
-        
+
         # Canvas para o Gráfico de Gantt
         self.gantt_canvas = tk.Canvas(master, width=1000, height=400, bg="white")
-        self.gantt_canvas.grid(row=4, column=0, columnspan=4, sticky="w", padx=10, pady=10)
+        self.gantt_canvas.grid(row=4, column=0, columnspan=4, sticky="w", padx=0, pady=10)
+
+        # Scroll do Gráfico de Gantt
+        yCanvasScrollbar = tk.Scrollbar(master, orient = "vertical", command=self.gantt_canvas.yview)
+        yCanvasScrollbar.grid(row=4, column=4, sticky="ns")
+        xCanvasScrollbar = tk.Scrollbar(master, orient = "horizontal", command=self.gantt_canvas.xview)
+        xCanvasScrollbar.grid(row=5, column=0, columnspan=4, sticky="ew")
+        self.gantt_canvas.configure(xscrollcommand=xCanvasScrollbar.set, yscrollcommand=yCanvasScrollbar.set)
 
         self.cpu_usage_label = ttk.Label(master, text="Uso da CPU:")
-        self.cpu_usage_label.grid(row=5, column=0, columnspan=4, sticky="w", padx=10)
+        self.cpu_usage_label.grid(row=6, column=0, columnspan=4, sticky="w", padx=10)
         self.cpu_usage_text = tk.Text(master, height=10, width=80)
-        self.cpu_usage_text.grid(row=6, column=0, columnspan=4, sticky="w", padx=10)
+        self.cpu_usage_text.grid(row=7, column=0, columnspan=4, sticky="w", padx=10)
         
         self.turnaround_label = ttk.Label(master, text="Turnaround Médio:")
-        self.turnaround_label.grid(row=7, column=0, columnspan=4, sticky="w", padx=10)
+        self.turnaround_label.grid(row=8, column=0, columnspan=4, sticky="w", padx=10)
         self.turnaround_text = ttk.Label(master, text="")
-        self.turnaround_text.grid(row=8, column=0, columnspan=4, sticky="w", padx=10)
+        self.turnaround_text.grid(row=9, column=0, columnspan=4, sticky="w", padx=10)
         
         self.processos = []
         self.process_input_fields = []
