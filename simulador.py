@@ -329,7 +329,13 @@ class Simulador:
       if processo.inicio is None:
          processo.inicio = start;
     
-      self.create_gantt_bar(processo.id, start, current_time, 'execucao', processo.inicio)
+      execution_time_start = max(start, processo.deadline)
+      execution_time_end = min(current_time, processo.deadline)
+      
+      if execution_time_end > start:
+         self.create_gantt_bar(processo.id, start, execution_time_end, 'execucao', processo.inicio)
+      if current_time > processo.deadline:
+         self.create_gantt_bar(processo.id, execution_time_start, current_time, 'deadline', processo.inicio)
 
       if processo.tempo_restante <= 0:
            processo.fim = current_time
