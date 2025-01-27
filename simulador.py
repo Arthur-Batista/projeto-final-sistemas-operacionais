@@ -159,15 +159,24 @@ class Simulador:
             messagebox.showerror("Erro", "Selecione um algoritmo.")
             self.animation_running = False
 
+        self.animation_running = True
+        for p in self.processos:
+            self.create_process_id_gantt_bar(p.id)
+        self.animation_running = False
+
     def simulate_fifo(self, current_time):
         processos_ordenados = sorted(self.processos, key=lambda p: p.chegada)
         
         if all(p.concluido for p in processos_ordenados):
              self.calculate_and_update_results(processos_ordenados)
              self.animation_running = False
+             self.fill_counter_bars(current_time)
              return
 
         processo = next((p for p in processos_ordenados if not p.concluido), None)
+
+        if processo is None:
+            self.fill_counter_bars(current_time)
         
         if processo:
             if current_time < processo.chegada:
@@ -194,6 +203,7 @@ class Simulador:
          if not processos_restantes:
               self.calculate_and_update_results(self.processos)
               self.animation_running = False
+              self.fill_counter_bars(current_time)
               return
 
          processos_disponiveis = [p for p in processos_restantes if p.chegada <= current_time]
@@ -240,6 +250,7 @@ class Simulador:
             if all(p.concluido for p in self.processos):  # Todos os processos concluídos
                 self.calculate_and_update_results(self.processos)
                 self.animation_running = False
+                self.fill_counter_bars(current_time)
                 return
             else:  # Aguardar o próximo instante
                 self.master.after(500, lambda: self.simulate_round_robin(current_time + 1, quantum, sobrecarga))
@@ -292,6 +303,7 @@ class Simulador:
       if not queue:
             self.calculate_and_update_results(self.processos)
             self.animation_running = False
+            self.fill_counter_bars(current_time)
             return
       
         # Filtrar processos que ja chegaram
@@ -317,7 +329,13 @@ class Simulador:
       if processo.inicio is None:
          processo.inicio = start;
     
-      self.create_gantt_bar(processo.id, start, current_time, 'execucao', processo.inicio)
+      execution_time_start = max(start, processo.deadline)
+      execution_time_end = min(current_time, processo.deadline)
+      
+      if execution_time_end > start:
+         self.create_gantt_bar(processo.id, start, execution_time_end, 'execucao', processo.inicio)
+      if current_time > processo.deadline:
+         self.create_gantt_bar(processo.id, execution_time_start, current_time, 'deadline', processo.inicio)
 
       if processo.tempo_restante <= 0:
            processo.fim = current_time
@@ -338,6 +356,10 @@ class Simulador:
        
       self.master.after(500, lambda: self.simulate_edf(current_time, quantum, sobrecarga))
 
+    def fill_counter_bars(self, max_time):
+        for start in range(max_time):
+            self.create_counter_gantt_bar(start)
+
     def create_gantt_bar(self, process_id, start, end, tipo, start_time):
         if not start_time or process_id not in self.process_start_time:
             self.process_start_time[process_id] = start
@@ -345,8 +367,8 @@ class Simulador:
         # start = self.process_start_time[process_id]
         
         largura = (end - start) * 50
-        x0 = start * 50
-        y0 = (process_id - 1) * 40 + 20 # Ajustar para posicionamento vertical
+        x0 = start * 50 + 30
+        y0 = (process_id) * 40  # Ajustar para posicionamento vertical
         x1 = x0 + largura
         y1 = y0 + 30
         
@@ -360,7 +382,31 @@ class Simulador:
             cor = "gray"
 
         self.gantt_canvas.create_rectangle(x0, y0, x1, y1, fill=cor, tags=f"processo_{process_id}")
-        self.gantt_canvas.create_text((x0 + x1) / 2, (y0 + y1) / 2, text=f"P{process_id} ({start}-{end})", tags=f"processo_{process_id}")
+        # self.gantt_canvas.create_text((x0 + x1) / 2, (y0 + y1) / 2, text=f"({start}-{end})", tags=f"processo_{process_id}")
+        self.gantt_canvas.config(scrollregion=self.gantt_canvas.bbox("all"))
+
+    def create_counter_gantt_bar(self, start):
+        end = start + 1
+        x0 = start * 50 + 30
+        y0 = 10 # Ajustar para posicionamento vertical
+        x1 = x0 + 50
+        y1 = y0 + 20
+        cor = "white"
+
+        self.gantt_canvas.create_rectangle(x0, y0, x1, y1, fill=cor, tags=f"counter_bar")
+        self.gantt_canvas.create_text(x1 - 3, (y0 + y1) / 2, text=f"{end}", tags=f"counter_bar", anchor="e")
+        self.gantt_canvas.config(scrollregion=self.gantt_canvas.bbox("all"))
+
+    def create_process_id_gantt_bar(self, process_id):        
+        largura = 20
+        x0 = 0
+        y0 = (process_id) * 40
+        x1 = x0 + largura
+        y1 = y0 + 30
+        cor = "white"
+
+        self.gantt_canvas.create_rectangle(x0, y0, x1, y1, fill=cor, tags=f"processo_{process_id}")
+        self.gantt_canvas.create_text((x0 + x1) / 2, (y0 + y1) / 2, text=f"P{process_id}", tags=f"processo_{process_id}")
         self.gantt_canvas.config(scrollregion=self.gantt_canvas.bbox("all"))
     
     def calculate_and_update_results(self, processos):
