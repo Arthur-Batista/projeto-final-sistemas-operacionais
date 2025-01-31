@@ -15,6 +15,13 @@ class Processo:
         self.concluido = False
         self.tempo_espera = 0
 
+class SlotPagina:
+    def __init__(self, slot, pagina, chegada, uso):
+        self.slot = slot
+        self.pagina = pagina
+        self.chegada = chegada
+        self.uso = uso
+
 class Simulador:
     def __init__(self, master):
         self.master = master
@@ -26,16 +33,17 @@ class Simulador:
         self.num_processes_entry.grid(row=0, column=1, sticky="w")
 
         ttk.Button(master, text="Adicionar Processos", command=self.create_process_input_fields).grid(row=0, column=2, sticky="w")
+        ttk.Label(master, text="Separe as páginas com espaços.").grid(row=0, column=4, sticky="w")
         
          # Frame para os inputs de cada processo
         self.processes_frame = ttk.Frame(master)
         self.processes_frame.grid(row=1, column=0, columnspan=3, sticky="w")
         
-        ttk.Label(master, text="Algoritmo:").grid(row=2, column=0, sticky="w")
+        ttk.Label(master, text="Algoritmo de Escalonamento de Processos:").grid(row=2, column=0, sticky="e")
         self.algorithm_combobox = ttk.Combobox(master, values=["FIFO", "SJF", "Round Robin", "EDF"])
         self.algorithm_combobox.grid(row=2, column=1, sticky="w")
 
-        ttk.Label(master, text="Quantum (Round Robin):").grid(row=2, column=2, sticky="e")
+        ttk.Label(master, text="Quantum:").grid(row=2, column=2, sticky="e")
         self.quantum_entry = ttk.Entry(master)
         self.quantum_entry.insert(0, "2") # Valor default
         self.quantum_entry.grid(row=2, column=3, sticky="w")
@@ -43,9 +51,13 @@ class Simulador:
         ttk.Label(master, text="Sobrecarga:").grid(row=2, column=4, sticky="e")
         self.sobrecarga_entry = ttk.Entry(master)
         self.sobrecarga_entry.insert(0, "0") # Valor default
-        self.sobrecarga_entry.grid(row=2, column=5, sticky="w")
+        self.sobrecarga_entry.grid(row=2, column=5, sticky="w", padx= 20)
 
-        ttk.Button(master, text="Iniciar Simulação", command=self.start_simulation).grid(row=3, column=0, columnspan=4, pady=10)
+        ttk.Label(master, text="Algoritmo de Substuição de Páginas:").grid(row=3, column=0, sticky="e")
+        self.algorithm_paginas_combobox = ttk.Combobox(master, values=["FIFO", "LRU"])
+        self.algorithm_paginas_combobox.grid(row=3, column=1, sticky="w")
+
+        ttk.Button(master, text="Iniciar Simulação", command=self.start_simulation).grid(row=3, column=2, columnspan=4, pady=10)
 
         # Canvas para o Gráfico de Gantt
         self.gantt_canvas = tk.Canvas(master, width=1000, height=400, bg="white")
@@ -62,6 +74,11 @@ class Simulador:
         self.cpu_usage_label.grid(row=6, column=0, columnspan=4, sticky="w", padx=10)
         self.cpu_usage_text = tk.Text(master, height=10, width=80)
         self.cpu_usage_text.grid(row=7, column=0, columnspan=4, sticky="w", padx=10)
+
+        self.ram_usage_label = ttk.Label(master, text="Uso da RAM:")
+        self.ram_usage_label.grid(row=6, column=4, columnspan=4, sticky="w", padx=10)
+        self.ram_canvas = tk.Canvas(master, height=170, width=380, bg="white")
+        self.ram_canvas.grid(row=7, column=4, columnspan=4, sticky="w", padx=10)
         
         self.turnaround_label = ttk.Label(master, text="Turnaround Médio:")
         self.turnaround_label.grid(row=8, column=0, columnspan=4, sticky="w", padx=10)
@@ -96,7 +113,7 @@ class Simulador:
               "Chegada": ("entry", "0"),
                 "Execução": ("entry", "1"),
                 "Deadline": ("entry", "10"),
-               "Páginas": ("entry", "1")
+               "Páginas": ("entry", "")
           }
           
           input_fields = {}
@@ -118,7 +135,7 @@ class Simulador:
                 chegada = int(fields["Chegada"].get())
                 execucao = int(fields["Execução"].get())
                 deadline = int(fields["Deadline"].get())
-                paginas = int(fields["Páginas"].get())
+                paginas = [int(item) for item in fields["Páginas"].get().split()]
                 
                 processo = Processo(i + 1, chegada, execucao, deadline, paginas)
                 self.processos.append(processo)
@@ -142,21 +159,35 @@ class Simulador:
         self.gantt_canvas.delete("all") # Limpa o canvas antigo
         self.cpu_usage_text.delete("1.0", tk.END)
         self.turnaround_text.config(text="")
+        self.ram_canvas.delete("rambox") # Limpa o canvas antigo
+        self.ram_slots = []
+        self.latest_filled_slot = -1
+        self.latest_highlighted_slot = -1
         
         algoritmo = self.algorithm_combobox.get()
         quantum = int(self.quantum_entry.get())
         sobrecarga = int(self.sobrecarga_entry.get())
+        algoritmo_paginas = self.algorithm_paginas_combobox.get()
         
+        if any(len(p.paginas) > 0 for p in self.processos) and algoritmo_paginas != "FIFO" and algoritmo_paginas != "LRU":
+            messagebox.showerror("Erro", "Selecione um algoritmo de substituição de Páginas.")
+            self.animation_running = False
+            return
+
         if algoritmo == "FIFO":
+            self.create_ram_bars()
             self.simulate_fifo(0)
         elif algoritmo == "SJF":
+            self.create_ram_bars()
             self.simulate_sjf(0)
         elif algoritmo == "Round Robin":
-             self.simulate_round_robin(0, quantum, sobrecarga)
+            self.create_ram_bars()
+            self.simulate_round_robin(0, quantum, sobrecarga)
         elif algoritmo == "EDF":
+            self.create_ram_bars()
             self.simulate_edf(0, quantum, sobrecarga)
         else:
-            messagebox.showerror("Erro", "Selecione um algoritmo.")
+            messagebox.showerror("Erro", "Selecione um algoritmo de escalonamento de Processos.")
             self.animation_running = False
 
         self.animation_running = True
@@ -187,15 +218,19 @@ class Simulador:
             current_time += processo.execucao
             processo.fim = current_time
             
-            self.create_gantt_bar(processo.id, processo.inicio, processo.fim, "execucao", processo.inicio)
+            self.simulate_page_substitution(current_time, processo.paginas)
+            wait_time = (500 * (len(processo.paginas) + 1)) + 500
+
+            self.master.after(wait_time, lambda: self.create_gantt_bar(processo.id, processo.inicio, processo.fim, "execucao", processo.inicio))
                         
             processo.concluido = True
 
             for p in self.processos:
                 if p != processo and p.chegada <= current_time and not p.concluido and p.tempo_restante > 0:
-                    self.create_gantt_bar(p.id, p.chegada, current_time, 'wait', processo.inicio)
+                    self.master.after(wait_time, lambda: self.create_gantt_bar(p.id, p.chegada, current_time, 'wait', processo.inicio))
             
-            self.master.after(500, lambda: self.simulate_fifo(current_time))
+            wait_time = wait_time + 500
+            self.master.after(wait_time, lambda: self.simulate_fifo(current_time))
     
     def simulate_sjf(self, current_time):
          processos_restantes = [p for p in self.processos if not p.concluido]
@@ -217,15 +252,18 @@ class Simulador:
          processo.inicio = current_time
          current_time += processo.execucao
          processo.fim = current_time
-         self.create_gantt_bar(processo.id, processo.inicio, processo.fim, "execucao", processo.inicio)
+         self.simulate_page_substitution(current_time, processo.paginas)
+         wait_time = (500 * (len(processo.paginas) + 1)) + 500
+         self.master.after(wait_time, lambda: self.create_gantt_bar(processo.id, processo.inicio, processo.fim, "execucao", processo.inicio))
                
          processo.concluido = True
 
          for p in self.processos:
               if p != processo and p.chegada <= current_time and not p.concluido and p.tempo_restante > 0:
-                  self.create_gantt_bar(p.id, p.chegada, current_time, 'wait', processo.inicio)
+                  self.master.after(wait_time, lambda: self.create_gantt_bar(p.id, p.chegada, current_time, 'wait', processo.inicio))
         
-         self.master.after(500, lambda: self.simulate_sjf(current_time))
+         wait_time = wait_time + 500
+         self.master.after(wait_time, lambda: self.simulate_sjf(current_time))
 
     def simulate_round_robin(self, current_time, quantum, sobrecarga):
         # Inicializar tempo de espera para cada processo
@@ -269,8 +307,12 @@ class Simulador:
         if processo.inicio is None:
             processo.inicio = start
 
+        # Substitui as páginas necessárias para o processo
+        self.simulate_page_substitution(current_time, processo.paginas)
+        wait_time = (500 * (len(processo.paginas) + 1)) + 600
+
         # Criar barra de execução no gráfico de Gantt
-        self.create_gantt_bar(processo.id, start, current_time, 'execucao', processo.inicio)
+        self.master.after(wait_time, lambda: self.create_gantt_bar(processo.id, start, current_time, 'execucao', processo.inicio))
 
         # Verificar se o processo foi concluído
         if processo.tempo_restante <= 0:
@@ -281,17 +323,18 @@ class Simulador:
             if sobrecarga > 0:
                 sobrecarga_inicio = current_time
                 current_time += sobrecarga
-                self.create_gantt_bar(processo.id, sobrecarga_inicio, current_time, 'sobrecarga', processo.inicio)
+                self.master.after(wait_time + 50, lambda:self.create_gantt_bar(processo.id, sobrecarga_inicio, current_time, 'sobrecarga', processo.inicio))
 
         # Incrementar tempo de espera de todos os outros processos
         for p in self.processos:
             if p != processo and p.chegada <= current_time and not p.concluido and p.tempo_restante > 0:
                 p.tempo_espera += current_time - start
                 wait_start_time = p.chegada if p.chegada > start else start
-                self.create_gantt_bar(p.id, wait_start_time, current_time, 'wait', processo.inicio)
+                self.master.after(wait_time, lambda: self.create_gantt_bar(p.id, wait_start_time, current_time, 'wait', processo.inicio))
 
         # Chamar a próxima execução
-        self.master.after(500, lambda: self.simulate_round_robin(current_time, quantum, sobrecarga))
+        wait_time += 550
+        self.master.after(wait_time, lambda: self.simulate_round_robin(current_time, quantum, sobrecarga))
 
 
 
@@ -316,9 +359,12 @@ class Simulador:
 
       queue.sort(key=lambda p: p.deadline)
       processo = queue[0]
+
+      self.simulate_page_substitution(current_time, processo.paginas)
+      wait_time = (500 * (len(processo.paginas) + 1)) + 500
      
       if current_time < processo.chegada and not processo.concluido:
-         self.create_gantt_bar(processo.id, current_time, processo.chegada, 'wait', processo.inicio)
+         self.master.after(wait_time, lambda: self.create_gantt_bar(processo.id, current_time, processo.chegada, 'wait', processo.inicio))
          current_time = processo.chegada
          
       execute_time = min(quantum, processo.tempo_restante)
@@ -327,15 +373,15 @@ class Simulador:
       processo.tempo_restante -= execute_time
       
       if processo.inicio is None:
-         processo.inicio = start;
+         processo.inicio = start
     
       execution_time_start = max(start, processo.deadline)
       execution_time_end = min(current_time, processo.deadline)
       
       if execution_time_end > start:
-         self.create_gantt_bar(processo.id, start, execution_time_end, 'execucao', processo.inicio)
+         self.master.after(wait_time, lambda: self.create_gantt_bar(processo.id, start, execution_time_end, 'execucao', processo.inicio))
       if current_time > processo.deadline:
-         self.create_gantt_bar(processo.id, execution_time_start, current_time, 'deadline', processo.inicio)
+         self.master.after(wait_time + 50, lambda: self.create_gantt_bar(processo.id, execution_time_start, current_time, 'deadline', processo.inicio))
 
       if processo.tempo_restante <= 0:
            processo.fim = current_time
@@ -345,16 +391,76 @@ class Simulador:
            if sobrecarga > 0:
               sobrecarga_inicio = current_time
               current_time += sobrecarga
-              self.create_gantt_bar(processo.id, sobrecarga_inicio, current_time, 'sobrecarga', processo.inicio)
+              wait_time += 50
+              self.master.after(wait_time + 50, lambda: self.create_gantt_bar(processo.id, sobrecarga_inicio, current_time, 'sobrecarga', processo.inicio))
            queue.pop(0)
            queue.insert(0, processo)
 
       for p in self.processos:
           if p != processo and p.chegada <= current_time and not p.concluido and p.tempo_restante > 0:
               wait_start_time = p.chegada if p.chegada > start else start
-              self.create_gantt_bar(p.id, wait_start_time, current_time, 'wait', processo.inicio)
+              self.master.after(wait_time, lambda: self.create_gantt_bar(p.id, wait_start_time, current_time, 'wait', processo.inicio))
        
-      self.master.after(500, lambda: self.simulate_edf(current_time, quantum, sobrecarga))
+      wait_time += 550
+      self.master.after(wait_time, lambda: self.simulate_edf(current_time, quantum, sobrecarga))
+
+    def simulate_page_substitution(self, current_time, paginas_processo):
+        paginas = paginas_processo
+        if len(paginas) == 0:
+            return
+
+        algoritmo = self.algorithm_paginas_combobox.get()
+
+        if algoritmo == "FIFO":
+            primeira_pagina = paginas[0]
+            paginas = paginas[1:]   # remove primeiro item
+            self.simulate_page_fifo(primeira_pagina, current_time)
+
+            self.master.after(500, lambda: self.simulate_page_substitution(current_time, paginas))
+
+
+    def simulate_page_fifo(self, pagina, current_time):
+        idx = -1
+        for i in range(len(self.ram_slots)):
+            if (self.ram_slots[i].pagina == pagina):
+                idx = i
+                break
+    
+        # remove destaque dos últimos adicionados
+        self.highlight_ram_box(max(self.latest_highlighted_slot, 0), "white")
+        self.highlight_ram_box(max(self.latest_filled_slot, 0), "white")
+
+        if (idx != -1):
+            # incrementar uso no lru
+            self.highlight_ram_box(idx, "cyan")
+            self.latest_highlighted_slot = idx
+            return
+
+        slot = SlotPagina(-1, pagina, current_time, current_time)
+        if (len(self.ram_slots) < 50):
+            slot.slot = len(self.ram_slots)
+            self.ram_slots.append(slot)
+            self.highlight_ram_box(slot.slot, "cyan")
+            self.latest_filled_slot = slot.slot
+            return
+        
+        latest_slot_idx = self.latest_filled_slot
+        if (latest_slot_idx == 49):
+            latest_slot_idx = -1
+
+        slot.slot = latest_slot_idx + 1
+        self.ram_slots[slot.slot] = slot
+        self.highlight_ram_box(slot.slot, "cyan")
+        self.latest_filled_slot = slot.slot
+
+    # Altera cor e texto da caixa
+    def highlight_ram_box(self, identifier, color):
+        if (len(self.ram_slots) <= identifier):
+            return
+
+        pagina = self.ram_slots[identifier].pagina
+        self.ram_canvas.itemconfigure(f"ram_box_{identifier}", fill=color)
+        self.ram_canvas.itemconfigure(f"ram_text_{identifier}", text=pagina)
 
     def fill_counter_bars(self, max_time):
         for start in range(max_time):
@@ -409,6 +515,19 @@ class Simulador:
         self.gantt_canvas.create_text((x0 + x1) / 2, (y0 + y1) / 2, text=f"P{process_id}", tags=f"processo_{process_id}")
         self.gantt_canvas.config(scrollregion=self.gantt_canvas.bbox("all"))
     
+    def create_ram_bars(self):
+        for x in range(10):
+            for y in range(5):
+                xi = (x * 37) + 5
+                xf = xi + 32
+                yi = (y * 34) + 5
+                yf = yi + 20
+
+                i = (x * 5) + y
+                self.ram_canvas.create_rectangle(xi, yi, xf, yf, fill="white", tags=f"ram_box_{i}")
+                self.ram_canvas.create_text((xi + xf)/2, (yi + yf)/2, text=f"-", tags=f"ram_text_{i}")
+                self.ram_canvas.config(scrollregion=self.ram_canvas.bbox("rambox"))
+
     def calculate_and_update_results(self, processos):
         turnaround_total = sum((p.fim - p.chegada) for p in processos)
         turnaround_medio = turnaround_total / len(processos) if processos else 0
