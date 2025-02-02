@@ -1,6 +1,5 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
-import time
 
 class Processo:
     def __init__(self, id, chegada, execucao, deadline, paginas):
@@ -208,6 +207,7 @@ class Simulador:
 
         if processo is None:
             self.fill_counter_bars(current_time)
+            return
         
         if processo:
             if current_time < processo.chegada:
@@ -215,20 +215,23 @@ class Simulador:
                 current_time = processo.chegada
 
             processo.inicio = current_time
+           
+            exec_start_time = current_time
             current_time += processo.execucao
             processo.fim = current_time
             
             self.simulate_page_substitution(current_time, processo.paginas)
             wait_time = (500 * (len(processo.paginas) + 1)) + 500
-
-            self.master.after(wait_time, lambda: self.create_gantt_bar(processo.id, processo.inicio, processo.fim, "execucao", processo.inicio))
-                        
+            self.master.after(wait_time, lambda: self.create_gantt_bar(processo.id, exec_start_time, processo.fim, "execucao", processo.inicio))
+            
             processo.concluido = True
-
+            
+            # Criar a barra de espera somente se não é o processo sendo executado
             for p in self.processos:
                 if p != processo and p.chegada <= current_time and not p.concluido and p.tempo_restante > 0:
-                    self.master.after(wait_time, lambda: self.create_gantt_bar(p.id, p.chegada, current_time, 'wait', processo.inicio))
-            
+                     if current_time != p.inicio:
+                        self.create_gantt_bar(p.id, p.chegada, current_time, 'wait', processo.inicio)
+        
             wait_time = wait_time + 500
             self.master.after(wait_time, lambda: self.simulate_fifo(current_time))
     
@@ -250,18 +253,22 @@ class Simulador:
          processo = min(processos_disponiveis, key=lambda p: p.execucao)
 
          processo.inicio = current_time
+       
+         exec_start_time = current_time
          current_time += processo.execucao
          processo.fim = current_time
          self.simulate_page_substitution(current_time, processo.paginas)
          wait_time = (500 * (len(processo.paginas) + 1)) + 500
-         self.master.after(wait_time, lambda: self.create_gantt_bar(processo.id, processo.inicio, processo.fim, "execucao", processo.inicio))
+         self.master.after(wait_time, lambda: self.create_gantt_bar(processo.id, exec_start_time, processo.fim, "execucao", processo.inicio))
                
          processo.concluido = True
 
+         # Criar a barra de espera imediatamente para outros processos
          for p in self.processos:
               if p != processo and p.chegada <= current_time and not p.concluido and p.tempo_restante > 0:
-                  self.master.after(wait_time, lambda: self.create_gantt_bar(p.id, p.chegada, current_time, 'wait', processo.inicio))
-        
+                   if current_time != p.inicio:
+                    self.create_gantt_bar(p.id, p.chegada, current_time, 'wait', processo.inicio)
+         
          wait_time = wait_time + 500
          self.master.after(wait_time, lambda: self.simulate_sjf(current_time))
 
@@ -324,22 +331,16 @@ class Simulador:
                 sobrecarga_inicio = current_time
                 current_time += sobrecarga
                 self.master.after(wait_time + 50, lambda:self.create_gantt_bar(processo.id, sobrecarga_inicio, current_time, 'sobrecarga', processo.inicio))
-
-        # Incrementar tempo de espera de todos os outros processos
+        
+        # Criar barra de espera imediatamente para outros processos
         for p in self.processos:
-            if p != processo and p.chegada <= current_time and not p.concluido and p.tempo_restante > 0:
-                p.tempo_espera += current_time - start
-                wait_start_time = p.chegada if p.chegada > start else start
-                self.master.after(wait_time, lambda: self.create_gantt_bar(p.id, wait_start_time, current_time, 'wait', processo.inicio))
+           if p != processo and p.chegada <= current_time and not p.concluido and p.tempo_restante > 0:
+               wait_start_time = p.chegada if p.chegada > start else start
+               self.create_gantt_bar(p.id, wait_start_time, current_time, 'wait', processo.inicio)
 
         # Chamar a próxima execução
         wait_time += 550
         self.master.after(wait_time, lambda: self.simulate_round_robin(current_time, quantum, sobrecarga))
-
-
-
-
-
        
     def simulate_edf(self, current_time, quantum, sobrecarga):
       queue = [p for p in self.processos if not p.concluido]
@@ -364,7 +365,7 @@ class Simulador:
       wait_time = (500 * (len(processo.paginas) + 1)) + 500
      
       if current_time < processo.chegada and not processo.concluido:
-         self.master.after(wait_time, lambda: self.create_gantt_bar(processo.id, current_time, processo.chegada, 'wait', processo.inicio))
+         self.create_gantt_bar(processo.id, current_time, processo.chegada, 'wait', processo.inicio)
          current_time = processo.chegada
          
       execute_time = min(quantum, processo.tempo_restante)
@@ -399,7 +400,7 @@ class Simulador:
       for p in self.processos:
           if p != processo and p.chegada <= current_time and not p.concluido and p.tempo_restante > 0:
               wait_start_time = p.chegada if p.chegada > start else start
-              self.master.after(wait_time, lambda: self.create_gantt_bar(p.id, wait_start_time, current_time, 'wait', processo.inicio))
+              self.create_gantt_bar(p.id, wait_start_time, current_time, 'wait', processo.inicio)
        
       wait_time += 550
       self.master.after(wait_time, lambda: self.simulate_edf(current_time, quantum, sobrecarga))
@@ -417,7 +418,6 @@ class Simulador:
             self.simulate_page_fifo(primeira_pagina, current_time)
 
             self.master.after(500, lambda: self.simulate_page_substitution(current_time, paginas))
-
 
     def simulate_page_fifo(self, pagina, current_time):
         idx = -1
