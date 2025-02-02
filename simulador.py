@@ -1,6 +1,5 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
-import time
 
 class Processo:
     def __init__(self, id, chegada, execucao, deadline, paginas):
@@ -26,63 +25,77 @@ class Simulador:
     def __init__(self, master):
         self.master = master
         master.title("Simulador de Escalonamento")
+        master.geometry("1200x700")  # Define o tamanho inicial da janela
 
-        # Labels e Entradas
-        ttk.Label(master, text="Número de Processos:").grid(row=0, column=0, sticky="w")
-        self.num_processes_entry = ttk.Entry(master)
+        # Criar um Canvas e Scrollbar para a janela principal
+        self.main_canvas = tk.Canvas(master)
+        self.main_canvas.pack(side="left", fill="both", expand=True)
+
+        self.main_scrollbar = ttk.Scrollbar(master, orient="vertical", command=self.main_canvas.yview)
+        self.main_scrollbar.pack(side="right", fill="y")
+
+        self.main_canvas.configure(yscrollcommand=self.main_scrollbar.set)
+
+        # Criar um frame dentro do Canvas para conter os widgets
+        self.main_frame = ttk.Frame(self.main_canvas)
+        self.main_canvas.create_window((0, 0), window=self.main_frame, anchor="n")
+        
+        # Labels e Entradas (usando main_frame como o frame pai)
+        ttk.Label(self.main_frame, text="Número de Processos:").grid(row=0, column=0, sticky="w")
+        self.num_processes_entry = ttk.Entry(self.main_frame)
         self.num_processes_entry.grid(row=0, column=1, sticky="w")
 
-        ttk.Button(master, text="Adicionar Processos", command=self.create_process_input_fields).grid(row=0, column=2, sticky="w")
-        ttk.Label(master, text="Separe as páginas com espaços.").grid(row=0, column=4, sticky="w")
+        ttk.Button(self.main_frame, text="Adicionar Processos", command=self.create_process_input_fields).grid(row=0, column=2, sticky="w")
+        ttk.Label(self.main_frame, text="Separe as páginas com espaços.").grid(row=0, column=4, sticky="w")
         
          # Frame para os inputs de cada processo
-        self.processes_frame = ttk.Frame(master)
+        self.processes_frame = ttk.Frame(self.main_frame)
         self.processes_frame.grid(row=1, column=0, columnspan=3, sticky="w")
         
-        ttk.Label(master, text="Algoritmo de Escalonamento de Processos:").grid(row=2, column=0, sticky="e")
-        self.algorithm_combobox = ttk.Combobox(master, values=["FIFO", "SJF", "Round Robin", "EDF"])
+        ttk.Label(self.main_frame, text="Algoritmo de Escalonamento de Processos:").grid(row=2, column=0, sticky="e")
+        self.algorithm_combobox = ttk.Combobox(self.main_frame, values=["FIFO", "SJF", "Round Robin", "EDF"])
         self.algorithm_combobox.grid(row=2, column=1, sticky="w")
 
-        ttk.Label(master, text="Quantum:").grid(row=2, column=2, sticky="e")
-        self.quantum_entry = ttk.Entry(master)
+        ttk.Label(self.main_frame, text="Quantum:").grid(row=2, column=2, sticky="e")
+        self.quantum_entry = ttk.Entry(self.main_frame)
         self.quantum_entry.insert(0, "2") # Valor default
         self.quantum_entry.grid(row=2, column=3, sticky="w")
 
-        ttk.Label(master, text="Sobrecarga:").grid(row=2, column=4, sticky="e")
-        self.sobrecarga_entry = ttk.Entry(master)
+        ttk.Label(self.main_frame, text="Sobrecarga:").grid(row=2, column=4, sticky="e")
+        self.sobrecarga_entry = ttk.Entry(self.main_frame)
         self.sobrecarga_entry.insert(0, "0") # Valor default
         self.sobrecarga_entry.grid(row=2, column=5, sticky="w", padx= 20)
 
-        ttk.Label(master, text="Algoritmo de Substuição de Páginas:").grid(row=3, column=0, sticky="e")
-        self.algorithm_paginas_combobox = ttk.Combobox(master, values=["FIFO", "LRU"])
+        ttk.Label(self.main_frame, text="Algoritmo de Substuição de Páginas:").grid(row=3, column=0, sticky="e")
+        self.algorithm_paginas_combobox = ttk.Combobox(self.main_frame, values=["FIFO", "LRU"])
         self.algorithm_paginas_combobox.grid(row=3, column=1, sticky="w")
 
-        ttk.Button(master, text="Iniciar Simulação", command=self.start_simulation).grid(row=3, column=2, columnspan=4, pady=10)
+        ttk.Button(self.main_frame, text="Iniciar Simulação", command=self.start_simulation).grid(row=3, column=2, columnspan=4, pady=10)
 
         # Canvas para o Gráfico de Gantt
-        self.gantt_canvas = tk.Canvas(master, width=1000, height=400, bg="white")
+        self.gantt_canvas = tk.Canvas(self.main_frame, width=1000, height=400, bg="white")
         self.gantt_canvas.grid(row=4, column=0, columnspan=4, sticky="w", padx=0, pady=10)
 
         # Scroll do Gráfico de Gantt
-        yCanvasScrollbar = tk.Scrollbar(master, orient = "vertical", command=self.gantt_canvas.yview)
+        yCanvasScrollbar = tk.Scrollbar(self.main_frame, orient = "vertical", command=self.gantt_canvas.yview)
         yCanvasScrollbar.grid(row=4, column=4, sticky="ns")
-        xCanvasScrollbar = tk.Scrollbar(master, orient = "horizontal", command=self.gantt_canvas.xview)
+        xCanvasScrollbar = tk.Scrollbar(self.main_frame, orient = "horizontal", command=self.gantt_canvas.xview)
         xCanvasScrollbar.grid(row=5, column=0, columnspan=4, sticky="ew")
         self.gantt_canvas.configure(xscrollcommand=xCanvasScrollbar.set, yscrollcommand=yCanvasScrollbar.set)
 
-        self.cpu_usage_label = ttk.Label(master, text="Uso da CPU:")
+        self.cpu_usage_label = ttk.Label(self.main_frame, text="Uso da CPU:")
         self.cpu_usage_label.grid(row=6, column=0, columnspan=4, sticky="w", padx=10)
-        self.cpu_usage_text = tk.Text(master, height=10, width=80)
+        self.cpu_usage_text = tk.Text(self.main_frame, height=10, width=80)
         self.cpu_usage_text.grid(row=7, column=0, columnspan=4, sticky="w", padx=10)
 
-        self.ram_usage_label = ttk.Label(master, text="Uso da RAM:")
+        self.ram_usage_label = ttk.Label(self.main_frame, text="Uso da RAM:")
         self.ram_usage_label.grid(row=6, column=4, columnspan=4, sticky="w", padx=10)
-        self.ram_canvas = tk.Canvas(master, height=170, width=380, bg="white")
+        self.ram_canvas = tk.Canvas(self.main_frame, height=170, width=380, bg="white")
         self.ram_canvas.grid(row=7, column=4, columnspan=4, sticky="w", padx=10)
         
-        self.turnaround_label = ttk.Label(master, text="Turnaround Médio:")
+        self.turnaround_label = ttk.Label(self.main_frame, text="Turnaround Médio:")
         self.turnaround_label.grid(row=8, column=0, columnspan=4, sticky="w", padx=10)
-        self.turnaround_text = ttk.Label(master, text="")
+        self.turnaround_text = ttk.Label(self.main_frame, text="")
         self.turnaround_text.grid(row=9, column=0, columnspan=4, sticky="w", padx=10)
         
         self.processos = []
@@ -91,6 +104,8 @@ class Simulador:
         self.process_start_time = {}
         self.animation_running = False
         
+        self.update_scroll_region() # Atualiza o scroll region ao iniciar
+    
     def create_process_input_fields(self):
       try:
             num_processes = int(self.num_processes_entry.get())
@@ -127,6 +142,13 @@ class Simulador:
                  input_fields[label] = entry
               
           self.process_input_fields.append(input_fields)
+      
+      self.update_scroll_region()
+      
+    def update_scroll_region(self):
+        self.main_frame.update_idletasks()
+        self.main_canvas.config(scrollregion=self.main_canvas.bbox("all"))
+       
 
     def collect_process_data(self):
         self.processos = []
@@ -189,6 +211,8 @@ class Simulador:
         else:
             messagebox.showerror("Erro", "Selecione um algoritmo de escalonamento de Processos.")
             self.animation_running = False
+        
+        self.master.after(50, lambda: self.update_scroll_region())
 
         self.animation_running = True
         for p in self.processos:
@@ -208,6 +232,7 @@ class Simulador:
 
         if processo is None:
             self.fill_counter_bars(current_time)
+            return
         
         if processo:
             if current_time < processo.chegada:
@@ -215,20 +240,23 @@ class Simulador:
                 current_time = processo.chegada
 
             processo.inicio = current_time
+           
+            exec_start_time = current_time
             current_time += processo.execucao
             processo.fim = current_time
             
             self.simulate_page_substitution(current_time, processo.paginas)
             wait_time = (500 * (len(processo.paginas) + 1)) + 500
-
-            self.master.after(wait_time, lambda: self.create_gantt_bar(processo.id, processo.inicio, processo.fim, "execucao", processo.inicio))
-                        
+            self.master.after(wait_time, lambda: self.create_gantt_bar(processo.id, exec_start_time, processo.fim, "execucao", processo.inicio))
+            
             processo.concluido = True
-
+            
+            # Criar a barra de espera somente se não é o processo sendo executado
             for p in self.processos:
                 if p != processo and p.chegada <= current_time and not p.concluido and p.tempo_restante > 0:
-                    self.master.after(wait_time, lambda: self.create_gantt_bar(p.id, p.chegada, current_time, 'wait', processo.inicio))
-            
+                     if current_time != p.inicio:
+                        self.create_gantt_bar(p.id, p.chegada, current_time, 'wait', processo.inicio)
+        
             wait_time = wait_time + 500
             self.master.after(wait_time, lambda: self.simulate_fifo(current_time))
     
@@ -250,18 +278,22 @@ class Simulador:
          processo = min(processos_disponiveis, key=lambda p: p.execucao)
 
          processo.inicio = current_time
+       
+         exec_start_time = current_time
          current_time += processo.execucao
          processo.fim = current_time
          self.simulate_page_substitution(current_time, processo.paginas)
          wait_time = (500 * (len(processo.paginas) + 1)) + 500
-         self.master.after(wait_time, lambda: self.create_gantt_bar(processo.id, processo.inicio, processo.fim, "execucao", processo.inicio))
+         self.master.after(wait_time, lambda: self.create_gantt_bar(processo.id, exec_start_time, processo.fim, "execucao", processo.inicio))
                
          processo.concluido = True
 
+         # Criar a barra de espera imediatamente para outros processos
          for p in self.processos:
               if p != processo and p.chegada <= current_time and not p.concluido and p.tempo_restante > 0:
-                  self.master.after(wait_time, lambda: self.create_gantt_bar(p.id, p.chegada, current_time, 'wait', processo.inicio))
-        
+                   if current_time != p.inicio:
+                    self.create_gantt_bar(p.id, p.chegada, current_time, 'wait', processo.inicio)
+         
          wait_time = wait_time + 500
          self.master.after(wait_time, lambda: self.simulate_sjf(current_time))
 
@@ -324,22 +356,16 @@ class Simulador:
                 sobrecarga_inicio = current_time
                 current_time += sobrecarga
                 self.master.after(wait_time + 50, lambda:self.create_gantt_bar(processo.id, sobrecarga_inicio, current_time, 'sobrecarga', processo.inicio))
-
-        # Incrementar tempo de espera de todos os outros processos
+        
+        # Criar barra de espera imediatamente para outros processos
         for p in self.processos:
-            if p != processo and p.chegada <= current_time and not p.concluido and p.tempo_restante > 0:
-                p.tempo_espera += current_time - start
-                wait_start_time = p.chegada if p.chegada > start else start
-                self.master.after(wait_time, lambda: self.create_gantt_bar(p.id, wait_start_time, current_time, 'wait', processo.inicio))
+           if p != processo and p.chegada <= current_time and not p.concluido and p.tempo_restante > 0:
+               wait_start_time = p.chegada if p.chegada > start else start
+               self.create_gantt_bar(p.id, wait_start_time, current_time, 'wait', processo.inicio)
 
         # Chamar a próxima execução
         wait_time += 550
         self.master.after(wait_time, lambda: self.simulate_round_robin(current_time, quantum, sobrecarga))
-
-
-
-
-
        
     def simulate_edf(self, current_time, quantum, sobrecarga):
       queue = [p for p in self.processos if not p.concluido]
@@ -364,7 +390,7 @@ class Simulador:
       wait_time = (500 * (len(processo.paginas) + 1)) + 500
      
       if current_time < processo.chegada and not processo.concluido:
-         self.master.after(wait_time, lambda: self.create_gantt_bar(processo.id, current_time, processo.chegada, 'wait', processo.inicio))
+         self.create_gantt_bar(processo.id, current_time, processo.chegada, 'wait', processo.inicio)
          current_time = processo.chegada
          
       execute_time = min(quantum, processo.tempo_restante)
@@ -399,7 +425,7 @@ class Simulador:
       for p in self.processos:
           if p != processo and p.chegada <= current_time and not p.concluido and p.tempo_restante > 0:
               wait_start_time = p.chegada if p.chegada > start else start
-              self.master.after(wait_time, lambda: self.create_gantt_bar(p.id, wait_start_time, current_time, 'wait', processo.inicio))
+              self.create_gantt_bar(p.id, wait_start_time, current_time, 'wait', processo.inicio)
        
       wait_time += 550
       self.master.after(wait_time, lambda: self.simulate_edf(current_time, quantum, sobrecarga))
@@ -417,7 +443,6 @@ class Simulador:
             self.simulate_page_fifo(primeira_pagina, current_time)
 
             self.master.after(500, lambda: self.simulate_page_substitution(current_time, paginas))
-
 
     def simulate_page_fifo(self, pagina, current_time):
         idx = -1
