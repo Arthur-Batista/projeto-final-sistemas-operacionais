@@ -246,7 +246,7 @@ class Simulador:
             processo.fim = current_time
             
             self.simulate_page_substitution(current_time, processo.paginas)
-            wait_time = (500 * (len(processo.paginas) + 1)) + 500
+            wait_time = 0 if len(processo.paginas) == 0 else (500 * (len(processo.paginas) + 1)) + 500
             self.master.after(wait_time, lambda: self.create_gantt_bar(processo.id, exec_start_time, processo.fim, "execucao", processo.inicio))
             
             processo.concluido = True
@@ -283,7 +283,7 @@ class Simulador:
          current_time += processo.execucao
          processo.fim = current_time
          self.simulate_page_substitution(current_time, processo.paginas)
-         wait_time = (500 * (len(processo.paginas) + 1)) + 500
+         wait_time = 0 if len(processo.paginas) == 0 else (500 * (len(processo.paginas) + 1)) + 500
          self.master.after(wait_time, lambda: self.create_gantt_bar(processo.id, exec_start_time, processo.fim, "execucao", processo.inicio))
                
          processo.concluido = True
@@ -341,7 +341,7 @@ class Simulador:
 
         # Substitui as páginas necessárias para o processo
         self.simulate_page_substitution(current_time, processo.paginas)
-        wait_time = (500 * (len(processo.paginas) + 1)) + 600
+        wait_time = 0 if len(processo.paginas) == 0 else (500 * (len(processo.paginas) + 1)) + 600
 
         # Criar barra de execução no gráfico de Gantt
         self.master.after(wait_time, lambda: self.create_gantt_bar(processo.id, start, current_time, 'execucao', processo.inicio))
@@ -387,7 +387,7 @@ class Simulador:
       processo = queue[0]
 
       self.simulate_page_substitution(current_time, processo.paginas)
-      wait_time = (500 * (len(processo.paginas) + 1)) + 500
+      wait_time = 0 if len(processo.paginas) == 0 else (500 * (len(processo.paginas) + 1)) + 500
      
       if current_time < processo.chegada and not processo.concluido:
          self.create_gantt_bar(processo.id, current_time, processo.chegada, 'wait', processo.inicio)
