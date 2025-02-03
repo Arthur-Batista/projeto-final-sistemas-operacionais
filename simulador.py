@@ -436,13 +436,15 @@ class Simulador:
             return
 
         algoritmo = self.algorithm_paginas_combobox.get()
+        primeira_pagina = paginas[0]
+        paginas = paginas[1:]   # remove primeiro item
 
         if algoritmo == "FIFO":
-            primeira_pagina = paginas[0]
-            paginas = paginas[1:]   # remove primeiro item
             self.simulate_page_fifo(primeira_pagina, current_time)
+        else:
+            self.simulate_page_lru(primeira_pagina, current_time)
 
-            self.master.after(500, lambda: self.simulate_page_substitution(current_time, paginas))
+        self.master.after(500, lambda: self.simulate_page_substitution(current_time, paginas))
 
     def simulate_page_fifo(self, pagina, current_time):
         idx = -1
@@ -477,6 +479,37 @@ class Simulador:
         self.ram_slots[slot.slot] = slot
         self.highlight_ram_box(slot.slot, "cyan")
         self.latest_filled_slot = slot.slot
+
+    def simulate_page_lru(self, pagina, current_time):
+        idx = -1
+        for i in range(len(self.ram_slots)):
+            if (self.ram_slots[i].pagina == pagina):
+                idx = i
+                break
+    
+        # remove destaque do último destacado
+        self.highlight_ram_box(max(self.latest_highlighted_slot, 0), "white")
+
+        if (idx != -1):
+            self.highlight_ram_box(idx, "cyan")
+            self.latest_highlighted_slot = idx
+            self.ram_slots[idx].uso = current_time
+            return
+
+        slot = SlotPagina(-1, pagina, current_time, current_time)
+        slots_ordenados = sorted(self.ram_slots, key=lambda p: p.uso)
+
+        if (len(self.ram_slots) < 50):
+            slot.slot = len(self.ram_slots)
+            self.ram_slots.append(slot)
+            self.highlight_ram_box(slot.slot, "cyan")
+            self.latest_highlighted_slot = slot.slot
+            return
+        
+        slot.slot = slots_ordenados[0].slot
+        self.ram_slots[slot.slot] = slot
+        self.highlight_ram_box(slot.slot, "cyan")
+        self.latest_highlighted_slot = slot.slot
 
     # Altera cor e texto da caixa
     def highlight_ram_box(self, identifier, color):
